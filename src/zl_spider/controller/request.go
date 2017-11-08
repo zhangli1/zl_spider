@@ -1,17 +1,32 @@
 package controller
 
-import ()
+import (
+    "zl_spider/config"
+	"net/http"
+	"io/ioutil"
+)
 
 
 type Request struct {
+    Cfg config.Config
 }
 
 
-func NewRequest() *Request {
-    request := &Request{}
+func NewRequest(cfg config.Config) *Request {
+    request := &Request{Cfg : cfg}
     return request
 }
 
-func (self *Request) Run() interface{} {
-    return "request"
+func (self *Request) Run() string {
+    return self.get()
+}
+
+func (self *Request) get() string {
+	resp, err := http.Get(self.Cfg.Base.Url)
+	if err != nil {
+		// handle error
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	return string(body)
 }

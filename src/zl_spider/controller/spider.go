@@ -19,6 +19,12 @@ func NewSpider(exeDir string, cfg config.Config) *Spider {
     return spider
 }
 
-func (self *Spider) Run() interface{} {
-	return self.Cfg
+func (self *Spider) Run() string {
+	var content string
+    request := NewRequest(self.Cfg)
+    content = request.Run()
+	parse := NewParse(content)
+	return parse.Run()
 }
+
+

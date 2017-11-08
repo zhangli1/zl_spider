@@ -1,16 +1,22 @@
 package controller
 
-import ()
+import (
+    "github.com/PuerkitoBio/goquery"
+)
 
 type Parse struct {
-
+    Content string
 }
 
-func NewParse() *Parse {
-    parse := &Parse{}
+func NewParse(content string) *Parse {
+    parse := &Parse{Content : content}
     return parse
 }
 
-func (self *Parse) Run() interface{} {
-    return "haha"
+func (self *Parse) Run() string {
+    return self.Content
+}
+
+func (self *Parse) parse_str() string {
+
 }
