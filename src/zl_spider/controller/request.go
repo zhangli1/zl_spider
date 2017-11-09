@@ -1,32 +1,44 @@
 package controller
 
 import (
-    "zl_spider/config"
+	"time"
 	"net/http"
-	"io/ioutil"
+	"bytes"
+	"encoding/json"
+	"github.com/PuerkitoBio/goquery"
 )
 
 
 type Request struct {
-    Cfg config.Config
+    UserConfig UserConfig
 }
 
 
-func NewRequest(cfg config.Config) *Request {
-    request := &Request{Cfg : cfg}
+func NewRequest(userConfig UserConfig) *Request {
+    request := &Request{UserConfig : userConfig}
     return request
 }
 
-func (self *Request) Run() string {
-    return self.get()
+func (self *Request) Run() interface{} {
+    return self.request()
 }
 
-func (self *Request) get() string {
-	resp, err := http.Get(self.Cfg.Base.Url)
-	if err != nil {
-		// handle error
+func (self *Request) request() interface{} {
+	timeout := self.UserConfig.TimeOut
+	c := &http.Client{
+	    Timeout: timeout * time.Second,
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	return string(body)
+
+    if len(self.UserConfig.Param) < 1 {
+	    resp, _ := c.Get(self.UserConfig.Url)
+    } else {
+		b, err := json.Marshal(self.UserConfig.Param)
+		if err != nil {
+			return err
+		}
+
+		body := bytes.NewBuffer([]byte(b))
+        c.Post(self.UserConfig.Url, "", &buf)
+    }
+    return goquery.NewDocumentFromResponse(resp)
 }

@@ -19,12 +19,16 @@ func NewSpider(exeDir string, cfg config.Config) *Spider {
     return spider
 }
 
-func (self *Spider) Run() string {
-	var content string
-    request := NewRequest(self.Cfg)
-    content = request.Run()
-	parse := NewParse(content)
-	return parse.Run()
+func (self *Spider) Run() interface{} {
+    //先从用户规则中读取需要的信息
+    var userConfig UserConfig
+    rule := NewRule()
+    userConfig = rule.Run()
+    request := NewRequest(userConfig)
+    content := request.Run()
+    return content
+	//parse := NewParse(content)
+	//return parse.Run()
 }
 
 

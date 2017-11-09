@@ -1,7 +1,7 @@
 package controller
 
 import (
-    "github.com/PuerkitoBio/goquery"
+//    "github.com/PuerkitoBio/goquery"
 )
 
 type Parse struct {
@@ -17,6 +17,6 @@ func (self *Parse) Run() string {
     return self.Content
 }
 
-func (self *Parse) parse_str() string {
+/*func (self *Parse) parse_str() string {
 
-}
+}*/
