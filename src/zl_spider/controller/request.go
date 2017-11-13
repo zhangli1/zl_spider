@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/PuerkitoBio/goquery"
+    "crypto/tls"
 )
 
 
@@ -19,26 +20,30 @@ func NewRequest(userConfig UserConfig) *Request {
     return request
 }
 
-func (self *Request) Run() interface{} {
-    return self.request()
+func (self *Request) Run() *goquery.Document {
+    return self.http_request()
 }
 
-func (self *Request) request() interface{} {
-	timeout := self.UserConfig.TimeOut
+func (self *Request) http_request() *goquery.Document {
+	tr := &http.Transport{
+        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DisableCompression: true,
+    }
+    timeout_s := self.UserConfig.TimeOut
 	c := &http.Client{
-	    Timeout: timeout * time.Second,
+	    Timeout: time.Duration(timeout_s) * time.Second,
+		Transport: tr,
 	}
 
-    if len(self.UserConfig.Param) < 1 {
-	    resp, _ := c.Get(self.UserConfig.Url)
-    } else {
-		b, err := json.Marshal(self.UserConfig.Param)
-		if err != nil {
-			return err
-		}
+    var resp *http.Response
 
+    if len(self.UserConfig.Param) < 1 {
+        resp, _ = c.Get(self.UserConfig.Url)
+    } else {
+		b, _ := json.Marshal(self.UserConfig.Param)
 		body := bytes.NewBuffer([]byte(b))
-        c.Post(self.UserConfig.Url, "", &buf)
+        resp, _ = c.Post(self.UserConfig.Url, "", body)
     }
-    return goquery.NewDocumentFromResponse(resp)
+    res, _ := goquery.NewDocumentFromResponse(resp)
+    return res
 }
