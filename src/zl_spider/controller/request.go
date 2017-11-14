@@ -35,15 +35,23 @@ func (self *Request) http_request() *goquery.Document {
 		Transport: tr,
 	}
 
-    var resp *http.Response
 
+    var resp *http.Response
+	var req *http.Request
+
+	b, _ := json.Marshal(self.UserConfig.Param)
+	body := bytes.NewBuffer([]byte(b))
     if len(self.UserConfig.Param) < 1 {
-        resp, _ = c.Get(self.UserConfig.Url)
+        //resp, _ = c.Get(self.UserConfig.Url)
+		req, _ = http.NewRequest("GET", self.UserConfig.Url, nil)
     } else {
-		b, _ := json.Marshal(self.UserConfig.Param)
-		body := bytes.NewBuffer([]byte(b))
-        resp, _ = c.Post(self.UserConfig.Url, "", body)
+        //resp, _ = c.Post(self.UserConfig.Url, "application/x-www-form-urlencoded", body)
+
+		req, _ = http.NewRequest("POST", self.UserConfig.Url, body)
     }
+	//req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36")
+	resp, _ = c.Do(req)
+
     res, _ := goquery.NewDocumentFromResponse(resp)
     return res
 }
