@@ -14,11 +14,11 @@ func NewParse(resp *goquery.Document) *Parse {
 }
 
 func (self *Parse) Run() interface{} {
-    var href string
     list := make([]string, 0)
-    self.Resp.Find("div").Each(func(i int, s *goquery.Selection) {
-        href, _ = s.Attr("class")
-        list = append(list, href)
+    item := self.Resp.Find("div[class=\"List-item\"]")
+    item.Each(func(i int, s *goquery.Selection) {
+        text := s.Eq(i).Find("span[class=\"RichText CopyrightRichText-richText\"]").Text()
+        list = append(list, text)
     })
     return list
 }
