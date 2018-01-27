@@ -16,6 +16,6 @@ func main(){
     gcfg.ReadFileInto(&server_cfg, "conf/base.cfg")
 
 	dir := "/test"
-	spider := controller.NewSpider(dir, server_cfg)
+    spider := controller.NewSpider(dir, server_cfg)
     fmt.Println(spider.Run())
  }
