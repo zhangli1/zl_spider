@@ -21,6 +21,7 @@ func GetUserConfigInfo() []UserConfigInfo {
     user_config_info_list = []UserConfigInfo{
         UserConfigInfo{Url:"https://www.baidu.com", Timeout:10, Param:""},
         UserConfigInfo{Url:"http://www.zhangli.me", Timeout:15, Param:""},
+        UserConfigInfo{Url:"http://newhouse.fang.com/house/s/", Timeout:25, Param:""},
     }
     return user_config_info_list
 }

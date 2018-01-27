@@ -8,6 +8,7 @@ package controller
 import (
 	"zl_spider/config"
     "github.com/PuerkitoBio/goquery"
+//    "time"
 )
 
 type Spider struct {
@@ -21,28 +22,35 @@ func NewSpider(exeDir string, cfg config.Config) *Spider {
 }
 
 func (self *Spider) Run() interface{} {
-    //先从用户规则中读取需要的信息
-  //  var userConfig UserConfig
 
     //读取配置和规则
-    /*rule := NewRule()
-    userConfig = rule.Run(self.Cfg)
+    rule := NewRule()
+    user_config_info_list := rule.Run(self.Cfg)
 
-    url_list := strings.Split(userConfig.Url, ",")
-    */
-    
+    c := make(chan string, len(user_config_info_list))
+
     ret_info := make(map[int] interface{})
-    for index, info := range config.GetUserConfigInfo() {
-        //进行请求
-        var content *goquery.Document
-        request := NewRequest(info)
-        content = request.Run()
+    for _, info := range user_config_info_list {
+        go self.GetInfo(info, c)
+    }
 
-        //进行解析
-        parse := NewParse(content)
-        ret_info[index] = parse.Run()
+    for i, _ := range user_config_info_list {
+        ret_info[i] = <- c
     }
     return ret_info
 }
+
+func (self *Spider) GetInfo(info config.UserConfigInfo, c chan string) {
+//    time.Sleep(10 * 1000 * time.Millisecond)
+    //进行请求
+    var content *goquery.Document
+    request := NewRequest(info)
+    content = request.Run()
+
+    //进行解析
+    parse := NewParse(content)
+    c <- parse.Run().(string)
+}
+
 
 
