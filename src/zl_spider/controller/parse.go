@@ -1,30 +1,27 @@
 package controller
 
 import (
+//	"fmt"
+//	"os"
     "github.com/PuerkitoBio/goquery"
+    "github.com/Tang-RoseChild/mahonia"
 )
 
 type Parse struct {
     Resp *goquery.Document
+    Coding string
 }
 
-func NewParse(resp *goquery.Document) *Parse {
-    parse := &Parse{Resp : resp}
+func NewParse(resp *goquery.Document, coding string) *Parse {
+    parse := &Parse{Resp : resp, Coding : coding}
     return parse
 }
 
 func (self *Parse) Run() interface{} {
-    //list := make([]string, 0)
     item, _ := self.Resp.Find("body").Html()
-    /*item.Each(func(i int, s *goquery.Selection) {
-        text := s.Find(".CopyrightRichText-richText").Text() + "||||||"
-        list = append(list, text)
-    })
-    return list
-    */
+    if self.Coding == "GBK" {
+        enc:=mahonia.NewDecoder("GBK")
+        return enc.ConvertString(item)
+    }
     return item
 }
-
-/*func (self *Parse) parse_str() string {
-
-}*/

@@ -26,7 +26,7 @@ func (self *Request) Run() *goquery.Document {
 func (self *Request) http_request() *goquery.Document {
 	tr := &http.Transport{
         TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DisableCompression: true,
+		//DisableCompression: true,
     }
     timeout_s := self.UserConfigInfo.Timeout
 	c := &http.Client{
@@ -52,7 +52,6 @@ func (self *Request) http_request() *goquery.Document {
     }
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36")
 	resp, _ = c.Do(req)
-
     res, _ := goquery.NewDocumentFromResponse(resp)
     return res
 }

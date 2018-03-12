@@ -7,7 +7,7 @@ package controller
 
 import (
 	"zl_spider/config"
-    "github.com/PuerkitoBio/goquery"
+//    "github.com/PuerkitoBio/goquery"
 //    "time"
 )
 
@@ -43,12 +43,13 @@ func (self *Spider) Run() interface{} {
 func (self *Spider) GetInfo(info config.UserConfigInfo, c chan string) {
 //    time.Sleep(10 * 1000 * time.Millisecond)
     //进行请求
-    var content *goquery.Document
+    //var content *goquery.Document
     request := NewRequest(info)
-    content = request.Run()
+    content := request.Run()
 
     //进行解析
-    parse := NewParse(content)
+    coding := info.Coding
+    parse := NewParse(content, coding)
     c <- parse.Run().(string)
 }
 
