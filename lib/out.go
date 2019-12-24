@@ -1,16 +1,13 @@
-package controller
-
-import ()
+package lib
 
 type Out struct {
-
 }
 
 func NewOut() *Out {
-    out := &Out{}
-    return out
+	out := &Out{}
+	return out
 }
 
 func (self *Out) Run() interface{} {
-    return "out"
+	return "out"
 }

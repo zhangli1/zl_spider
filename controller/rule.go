@@ -13,5 +13,5 @@ func NewRule() *Rule {
 }
 
 func (self *Rule) Run(cfg config.Config) []config.UserConfigInfo {
-    return config.GetUserConfigInfo()
+	return config.GetUserConfigInfo()
 }
