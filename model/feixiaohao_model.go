@@ -2,7 +2,7 @@ package model
 
 import (
 	//"encoding/json"
-	//"fmt"
+	"fmt"
 	//glib "lib"
 	//"math/rand"
 	//	"os"
@@ -10,8 +10,9 @@ import (
 	//	"strings"
 	//	"time"
 	"zl_spider/config"
-	//	"zl_spider/lib"
-	//	"github.com/PuerkitoBio/goquery"
+	"zl_spider/lib"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 type FeixiaoHaoModel struct {
@@ -20,12 +21,21 @@ type FeixiaoHaoModel struct {
 }
 
 func NewFeixiaoHaoModel(coding config.UserConfigInfo, cfg config.Config) *FeixiaoHaoModel {
-	boss_model := &FeixiaoHaoModel{Coding: coding, Cfg: cfg}
-	return boss_model
+	feixiaohao_model := &FeixiaoHaoModel{Coding: coding, Cfg: cfg}
+	return feixiaohao_model
 }
 
 func (self *FeixiaoHaoModel) Run() interface{} {
-	return "Feixiaohao"
+	ret := lib.NewRequest(self.Coding, self.Cfg).Run()
+	return self.Parse(ret)
+}
+
+func (self *FeixiaoHaoModel) Parse(doc *goquery.Document) interface{} {
+	fmt.Println(doc.Find(".ivu-table-body").Find("").Html())
+	doc.Find(".ivu-table-body .ivu-table-row").Each(func(i int, s *goquery.Selection) {
+		//fmt.Println(s.Html())
+	})
+	return nil
 }
 
 func (self *FeixiaoHaoModel) Destruct(param interface{}) interface{} {

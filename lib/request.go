@@ -7,7 +7,6 @@ import (
 	"fmt"
 	//	"math/rand"
 	"net/http"
-	"net/url"
 	//"os"
 	"time"
 	"zl_spider/config"
@@ -31,15 +30,15 @@ func (self *Request) Run() *goquery.Document {
 
 func (self *Request) http_request() *goquery.Document {
 	var tr *http.Transport
+	//先临时固定代理地址
+	/*proxy := func(_ *http.Request) (*url.URL, error) {
+		return url.Parse(self.Cfg.Proxy.Links)
+	}*/
 	if self.Cfg.Proxy.IsUse == 1 {
-		//先临时固定代理地址
-		proxy := func(_ *http.Request) (*url.URL, error) {
-			return url.Parse(self.Cfg.Proxy.Link)
-		}
 
 		tr = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			Proxy:           proxy,
+			//Proxy:           proxy,
 			//DisableCompression: true,
 		}
 	} else {
@@ -93,6 +92,19 @@ func (self *Request) http_request() *goquery.Document {
 	//req.Header.Set("User-Agent", rmua)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
+
+	//添加cookie
+	/*cookieStr := "lastCity=101200100; _uab_collina=156680011187464472376556; __c=1578469226; __g=-; __l=l=%2Fwww.zhipin.com%2Fweb%2Fcommon%2Fsecurity-check.html%3Fseed%3DxvsC2ObcAnjnNqlECUh3WfaSG%252Ff%252F6x47dA9eu%252BB3gwg%253D%26name%3D7ee39cf5%26ts%3D1578469225239%26callbackUrl%3D%252Fc101280600%253Fquery%253Dphp%2526page%253D1%26srcReferer%3D&r=&friend_source=0&friend_source=0; Hm_lvt_194df3105ad7148dcf2b98a91b5e727a=1577191781,1578469228; __a=66176214.1566800112.1577191780.1578469226.59.7.13.19; Hm_lpvt_194df3105ad7148dcf2b98a91b5e727a=1578642197; __zp_stoken__=887aUp5dIbX1F6IrVtZ8IY%2FpDhJtU2VztA6RctCg%2BgpAUoDGYc%2FsJWNTk8Wqo4kQnkYyCiMbsvtYXcgl2ryBBztjaxIK06Bwxf15y6ZsB86GDgpjkWJqMc3FrQt5VKX77nut"
+	for _, v := range strings.Split(cookieStr, "; ") {
+		cv := strings.Split(v, "=")
+		cookie1 := &http.Cookie{
+			Name:     cv[0],
+			Value:    cv[1],
+			HttpOnly: true,
+		}
+		req.AddCookie(cookie1)
+	}*/
+
 	resp, err := c.Do(req)
 	if err != nil {
 		fmt.Println(err)

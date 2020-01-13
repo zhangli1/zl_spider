@@ -5,6 +5,9 @@
 package main
 
 import (
+	"fmt"
+	"runtime/debug"
+	"time"
 	"zl_spider/config"
 	"zl_spider/controller"
 
@@ -14,9 +17,17 @@ import (
 func main() {
 	var server_cfg config.Config
 	gcfg.ReadFileInto(&server_cfg, "conf/base.cfg")
-
 	dir := "/test"
 	spider := controller.NewSpider(dir, server_cfg)
+
+	defer func() {
+		if re := recover(); re != nil {
+			debug.PrintStack()
+			fmt.Println(string(debug.Stack()))
+			time.Sleep(time.Duration(3) * time.Second)
+
+		}
+	}()
 	spider.Run()
 
 	/*for _, v := range ret.(map[int]interface{}) {

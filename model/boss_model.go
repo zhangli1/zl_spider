@@ -3,16 +3,19 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	glib "lib"
+	"log"
 	"math/rand"
-	//	"os"
-	"regexp"
 	"strings"
 	"time"
 	"zl_spider/config"
 	"zl_spider/lib"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/tebeka/selenium"
+	"github.com/tebeka/selenium/chrome"
+	ghtml "golang.org/x/net/html"
 )
 
 type BossModel struct {
@@ -34,23 +37,32 @@ func NewBossModel(coding config.UserConfigInfo, cfg config.Config) *BossModel {
 
 func (self *BossModel) Run() interface{} {
 	city_list := make(map[string]string, 0)
-	//city_list["c101010100"] = "北京"
-	//city_list["c101020100"] = "上海"
-	//city_list["c101280100"] = "广州"
+	city_list["c101010100"] = "北京"
+	city_list["c101020100"] = "上海"
+	city_list["c101280100"] = "广州"
 	city_list["c101280600"] = "深圳"
 	city_list["c101200100"] = "武汉"
 
 	position := make([]string, 0)
-	//position = []string{"php", "python", "golang"}
-	position = []string{"php", "golang"}
+	position = []string{"php", "python", "golang"}
+	//position = []string{"php", "golang"}
 	//position = []string{"python", "golang"}
 
-	coding := self.Coding
+	//coding := self.Coding
 
 	//生成1到10页码，顺序打乱
-	page_list := []int{1, 5, 4, 2, 3}
+	page_list := []int{1, 5, 4, 2, 3, 6, 10, 8, 9, 7}
 
 	requ_url_tmp := self.Coding.Url
+
+	type BossRet struct {
+		HasMore bool
+		Rescode int
+		Html    string
+	}
+	// 初始化随机数的资源库, 如果不执行这行, 不管运行多少次都返回同样的值
+	rand.Seed(time.Now().UnixNano())
+
 	for ck, cv := range city_list {
 		for _, pv := range position {
 			req_url := ""
@@ -58,32 +70,106 @@ func (self *BossModel) Run() interface{} {
 			//page := 1
 			for _, page := range page_list {
 				//for {
-				req_url = fmt.Sprintf("%s/%s?query=%s&page=%d", requ_url_tmp, ck, pv, page)
+				req_url = fmt.Sprintf("%s?city=%s&query=%s&page=%d", requ_url_tmp, ck, pv, page)
 				fmt.Println(req_url)
+
 				self.Coding.Url = req_url
-				ret := self.Parse(lib.NewRequest(self.Coding, self.Cfg).Run(), cv, page)
+
+				//req_ret, _ := lib.NewRequest(self.Coding, self.Cfg).Run().Html()
+				req_ret := self.StartChrome(req_url)
+				if len(req_ret) < 50 {
+					continue
+				}
+				jsonStr := req_ret[84 : len(req_ret)-20]
+				fmt.Println(req_ret)
+
+				var bossret BossRet
+				json.Unmarshal([]byte(jsonStr), &bossret)
+				htmlData := html.UnescapeString(bossret.Html)
+
+				htmlNode, _ := ghtml.Parse(strings.NewReader(htmlData))
+				ret := self.Parse(goquery.NewDocumentFromNode(htmlNode), cv, page)
+
 				if len(ret) < 1 {
-					//break
 					continue
 				}
 
 				//写入els数据
 				for _, rv := range ret {
+					fmt.Println(rv)
 					self.WriteEls(rv)
 				}
 				time.Sleep(time.Second * time.Duration(rand.Intn(5)))
-				page++
+				//page++
 			}
 		}
-		time.Sleep(time.Second * time.Duration(self.Cfg.Frequency.City))
+		time.Sleep(time.Second * time.Duration(rand.Intn(self.Cfg.Frequency.City)))
 	}
 
-	self.Coding = coding
-	//self.Resp = lib.NewRequest(self.Coding).Run()
-
-	//return self.Destruct(job_data)
 	return ""
 
+}
+
+func (self *BossModel) StartChrome(Url string) string {
+	opts := []selenium.ServiceOption{}
+	caps := selenium.Capabilities{
+		"browserName":     "chrome",
+		"excludeSwitches": "enable-automation",
+	}
+
+	// 禁止加载图片，加快渲染速度
+	imagCaps := map[string]interface{}{
+		"profile.managed_default_content_settings.images": 2,
+	}
+
+	/*proxyStr := ""
+	if self.Cfg.Proxy.Links != "" {
+		proxyStr = fmt.Sprintf("--proxy-server=%s", self.Cfg.Proxy.Links)
+	}*/
+
+	chromeCaps := chrome.Capabilities{
+		Prefs: imagCaps,
+		Path:  "",
+		Args: []string{
+			"--headless", // 设置Chrome无头模式
+			"--no-sandbox",
+			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36", // 模拟user-agent，防反爬
+			fmt.Sprintf("--proxy-server=%s", self.Cfg.Proxy.Links),
+		},
+		ExcludeSwitches: []string{
+			"--excludeSwitches=enable-automation",
+		},
+	}
+	caps.AddChrome(chromeCaps)
+	// 启动chromedriver，端口号可自定义
+	//service, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
+	_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
+	if err != nil {
+		log.Printf("Error starting the ChromeDriver server: %v", err)
+	}
+	// 调起chrome浏览器
+	webDriver, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 19515))
+	if err != nil {
+		panic(err)
+	}
+	// 这是目标网站留下的坑，不加这个在linux系统中会显示手机网页，每个网站的策略不一样，需要区别处理。
+	/*webDriver.AddCookie(&selenium.Cookie{
+		Name:  "cookie",
+		Value: "",
+	})*/
+
+	// 导航到目标网站
+	err = webDriver.Get(Url)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to load page: %s\n", err))
+	}
+	//fmt.Println(webDriver.Title())
+	ret, err := webDriver.PageSource()
+	webDriver.Close()
+	if err == nil {
+		return ret
+	}
+	return ""
 }
 
 //写入Elasticsearch
@@ -112,13 +198,10 @@ func (self *BossModel) Parse(resp *goquery.Document, city string, page int) []li
 	job_data := make([]lib.JobData, 0)
 
 	fmt.Println(resp.Html())
-	//获取当前真实的页码数
-	p := glib.StringToInt(resp.Find(".page .cur").Text())
-	if p < page {
-		return job_data
-	}
 
-	resp.Find(".job-list ul li").Each(func(i int, s *goquery.Selection) {
+	//return job_data
+
+	resp.Find("li").Each(func(i int, s *goquery.Selection) {
 		line = lib.JobData{}
 		//抓取网站
 		line.WebSite = self.Coding.ModelPrefix
@@ -126,27 +209,30 @@ func (self *BossModel) Parse(resp *goquery.Document, city string, page int) []li
 		line.City = city
 
 		//职位信息
-		line.JobTitle = s.Find(".job-primary .info-primary h3 .job-title").Text()
+		line.JobTitle = s.Find(".title h4").Text()
 		//薪水
-		line.Salary = s.Find(".job-primary .info-primary h3 .red").Text()
+		line.Salary = s.Find(".salary").Text()
 		//地址、经验、学历
-		p_add_data, _ := s.Find(".job-primary .info-primary p").Html()
+		p_add_data := make([]string, 0)
+		s.Find(".msg em").Each(func(i int, s *goquery.Selection) {
+			p_add_data = append(p_add_data, s.Text())
+		})
 
-		vline_data := strings.Split(p_add_data, "<em class=\"vline\"></em>")
-
-		line.Address = vline_data[0]
-		if len(vline_data) > 2 {
-			line.Empirical = vline_data[1]
-			line.Education = vline_data[2]
-		} else if len(vline_data) > 1 && (strings.Contains(vline_data[1], "-") || strings.Contains(vline_data[1], "年") || strings.Contains(vline_data[1], "经验不限")) {
-			line.Education = vline_data[1]
+		if len(p_add_data) > 0 {
+			line.Address = p_add_data[0]
+			if len(p_add_data) > 2 {
+				line.Empirical = p_add_data[1]
+				line.Education = p_add_data[2]
+			} else if len(p_add_data) > 1 && (strings.Contains(p_add_data[1], "-") || strings.Contains(p_add_data[1], "年") || strings.Contains(p_add_data[1], "经验不限")) {
+				line.Education = p_add_data[1]
+			}
 		}
 
 		//公司名
-		line.CompanyName = s.Find(".job-primary .info-company .company-text h3").Text()
+		line.CompanyName = s.Find(".name").Text()
 		//公司类型
-		c_company_data, _ := s.Find(".job-primary .info-company .company-text p").Html()
-		vline_data = strings.Split(c_company_data, "<em class=\"vline\"></em>")
+		/*c_company_data, _ := s.Find(".job-primary .info-company .company-text p").Html()
+		vline_data := strings.Split(c_company_data, "<em class=\"vline\"></em>")
 		line.CompanyType = vline_data[0]
 		//公司人数
 		if len(vline_data) > 2 {
@@ -168,6 +254,7 @@ func (self *BossModel) Parse(resp *goquery.Document, city string, page int) []li
 
 		//更新时间
 		line.UpdateTime = self.ProcessTime(s.Find(".info-publis p").Text())
+		*/
 		line.CreateTime = glib.TimestampToDate("", glib.GetCurrentTime())
 		job_data = append(job_data, line)
 	})

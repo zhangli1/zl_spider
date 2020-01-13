@@ -18,7 +18,7 @@ type Config struct {
 		City int
 	}
 	Proxy struct {
-		Link  string
+		Links string
 		IsUse int
 	}
 }
@@ -30,25 +30,25 @@ type UserConfigInfo struct {
 	Action      string                 //方法类型
 	Coding      string
 	ModelPrefix string //模型实例化前缀
-	Switch      bool
+	Switch      bool   //开关， 是否打开抓取
 }
 
 func GetUserConfigInfo() []UserConfigInfo {
 	var user_config_info_list []UserConfigInfo
 	user_config_info_list = []UserConfigInfo{
 		UserConfigInfo{
-			Url:         "https://www.zhipin.com",
+			Url:         "https://www.zhipin.com/mobile/jobs.json",
 			Timeout:     15,
 			ModelPrefix: "boss",
-			Action:      "bd",
-			Switch:      false,
+			Action:      "",
+			Switch:      true,
 		},
 		UserConfigInfo{
 			Url:         "http://www.feixiaohao.com/list_2.html",
 			Timeout:     15,
 			ModelPrefix: "feixiaohao",
 			Action:      "",
-			Switch:      true,
+			Switch:      false,
 		},
 		UserConfigInfo{
 			Url:         "https://www.zhihu.com/search?type=content&q=%E6%B7%B1%E5%9C%B3",
@@ -57,7 +57,20 @@ func GetUserConfigInfo() []UserConfigInfo {
 			Action:      "",
 			Switch:      false,
 		},
-		//UserConfigInfo{Url:"http://newhouse.wuhan.fang.com/house/s/jiangxia2/a77-b25000%2C10000-b82-c412/", Timeout:25, Param:"", Action:"fang", Coding:"GBK"},
+		UserConfigInfo{
+			Url:         "https://www.v2ex.com",
+			Timeout:     25,
+			ModelPrefix: "v2ex",
+			Action:      "fang",
+			Switch:      false,
+		},
+		UserConfigInfo{
+			Url:         "https://www.freeip.top/api/proxy_ips",
+			Timeout:     15,
+			ModelPrefix: "freeip",
+			Action:      "freeip",
+			Switch:      false,
+		},
 	}
 	return user_config_info_list
 }
