@@ -26,7 +26,8 @@ func NewV2exModel(coding config.UserConfigInfo, cfg config.Config) *V2exModel {
 }
 
 func (self *V2exModel) Run() interface{} {
-	ret := lib.NewRequest(self.Coding, self.Cfg).Run()
+	var req_param map[string]interface{}
+	ret := lib.NewRequest(self.Coding, self.Cfg).Run(self.Coding.Url, req_param)
 	return self.Parse(ret)
 }
 

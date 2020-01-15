@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"html"
 	glib "lib"
-	"log"
 	"math/rand"
+	"os"
+	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 	"zl_spider/config"
 	"zl_spider/lib"
 
+	l4g "code.google.com/p/log4go"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
@@ -19,8 +22,12 @@ import (
 )
 
 type BossModel struct {
-	Coding config.UserConfigInfo
-	Cfg    config.Config
+	Coding    config.UserConfigInfo
+	Cfg       config.Config
+	l4gLogger *l4g.Logger
+	Sigs      chan os.Signal
+	Running   bool
+	Wg        sync.WaitGroup
 }
 
 type SearchField struct {
@@ -30,12 +37,13 @@ type SearchField struct {
 	Page int
 }
 
-func NewBossModel(coding config.UserConfigInfo, cfg config.Config) *BossModel {
-	boss_model := &BossModel{Coding: coding, Cfg: cfg}
+func NewBossModel(coding config.UserConfigInfo, cfg config.Config, logger *l4g.Logger, sigs chan os.Signal, wg sync.WaitGroup) *BossModel {
+	boss_model := &BossModel{Coding: coding, Cfg: cfg, l4gLogger: logger, Sigs: sigs, Wg: wg}
 	return boss_model
 }
 
 func (self *BossModel) Run() interface{} {
+	fmt.Println("BossModel")
 	city_list := make(map[string]string, 0)
 	city_list["c101010100"] = "北京"
 	city_list["c101020100"] = "上海"
@@ -45,15 +53,13 @@ func (self *BossModel) Run() interface{} {
 
 	position := make([]string, 0)
 	position = []string{"php", "python", "golang"}
-	//position = []string{"php", "golang"}
-	//position = []string{"python", "golang"}
 
 	//coding := self.Coding
 
 	//生成1到10页码，顺序打乱
 	page_list := []int{1, 5, 4, 2, 3, 6, 10, 8, 9, 7}
 
-	requ_url_tmp := self.Coding.Url
+	req_url_tmp := self.Coding.Url
 
 	type BossRet struct {
 		HasMore bool
@@ -62,48 +68,72 @@ func (self *BossModel) Run() interface{} {
 	}
 	// 初始化随机数的资源库, 如果不执行这行, 不管运行多少次都返回同样的值
 	rand.Seed(time.Now().UnixNano())
+	//优雅的退出
+	go func() {
+		<-self.Sigs
+		self.Running = true
+	}()
 
-	for ck, cv := range city_list {
-		for _, pv := range position {
-			req_url := ""
-
-			//page := 1
-			for _, page := range page_list {
-				//for {
-				req_url = fmt.Sprintf("%s?city=%s&query=%s&page=%d", requ_url_tmp, ck, pv, page)
-				fmt.Println(req_url)
-
-				self.Coding.Url = req_url
-
-				//req_ret, _ := lib.NewRequest(self.Coding, self.Cfg).Run().Html()
-				req_ret := self.StartChrome(req_url)
-				if len(req_ret) < 50 {
-					continue
-				}
-				jsonStr := req_ret[84 : len(req_ret)-20]
-				fmt.Println(req_ret)
-
-				var bossret BossRet
-				json.Unmarshal([]byte(jsonStr), &bossret)
-				htmlData := html.UnescapeString(bossret.Html)
-
-				htmlNode, _ := ghtml.Parse(strings.NewReader(htmlData))
-				ret := self.Parse(goquery.NewDocumentFromNode(htmlNode), cv, page)
-
-				if len(ret) < 1 {
-					continue
-				}
-
-				//写入els数据
-				for _, rv := range ret {
-					fmt.Println(rv)
-					self.WriteEls(rv)
-				}
-				time.Sleep(time.Second * time.Duration(rand.Intn(5)))
-				//page++
-			}
+	for {
+		if self.Running {
+			self.Wg.Done()
+			break
 		}
-		time.Sleep(time.Second * time.Duration(rand.Intn(self.Cfg.Frequency.City)))
+		for ck, cv := range city_list {
+			for _, pv := range position {
+				req_url := ""
+
+				//page := 1
+				for _, page := range page_list {
+					//for {
+					req_url = fmt.Sprintf("%s?city=%s&query=%s&page=%d", req_url_tmp, ck, pv, page)
+					self.l4gLogger.Info(req_url)
+
+					self.Coding.Url = req_url
+
+					req_ret := ""
+					glib.Try(func() {
+						//req_ret, _ := lib.NewRequest(self.Coding, self.Cfg).Run().Html()
+						req_ret = self.StartChrome(req_url)
+					}, func(e interface{}) {
+						debug.PrintStack()
+						self.l4gLogger.Error(e)
+						self.l4gLogger.Error(debug.Stack())
+					})
+					if len(req_ret) < 50 {
+						continue
+					}
+					jsonStr := req_ret[84 : len(req_ret)-20]
+
+					var bossret BossRet
+					json.Unmarshal([]byte(jsonStr), &bossret)
+					htmlData := html.UnescapeString(bossret.Html)
+
+					htmlNode, _ := ghtml.Parse(strings.NewReader(htmlData))
+					ret := self.Parse(goquery.NewDocumentFromNode(htmlNode), cv, page)
+
+					if len(ret) < 1 {
+						continue
+					}
+
+					//写入els数据
+					for _, rv := range ret {
+						self.l4gLogger.Info(rv)
+						glib.Try(func() {
+							self.WriteEls(rv)
+						}, func(e interface{}) {
+							debug.PrintStack()
+							fmt.Println(e)
+							self.l4gLogger.Error(debug.Stack())
+						})
+					}
+					time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+					//page++
+				}
+			}
+			time.Sleep(time.Second * time.Duration(rand.Intn(self.Cfg.Frequency.City)))
+		}
+		time.Sleep(time.Second * time.Duration(rand.Intn(300)))
 	}
 
 	return ""
@@ -127,6 +157,21 @@ func (self *BossModel) StartChrome(Url string) string {
 		proxyStr = fmt.Sprintf("--proxy-server=%s", self.Cfg.Proxy.Links)
 	}*/
 
+	links := ""
+	redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
+
+	jsonstrByRedis, _ := redis.GET("freeIps")
+	ipListStr := glib.B2S(jsonstrByRedis.([]uint8))
+
+	var ipList []string
+	json.Unmarshal([]byte(ipListStr), &ipList)
+	if len(ipList) < 1 {
+		links = self.Cfg.Proxy.Links
+	} else {
+		linkTmp := ipList[rand.Intn(len(ipList))]
+		links = strings.Replace(strings.Replace(linkTmp, "http://", "", -1), "https://", "", -1)
+	}
+
 	chromeCaps := chrome.Capabilities{
 		Prefs: imagCaps,
 		Path:  "",
@@ -134,7 +179,7 @@ func (self *BossModel) StartChrome(Url string) string {
 			"--headless", // 设置Chrome无头模式
 			"--no-sandbox",
 			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36", // 模拟user-agent，防反爬
-			fmt.Sprintf("--proxy-server=%s", self.Cfg.Proxy.Links),
+			fmt.Sprintf("--proxy-server=%s", links),
 		},
 		ExcludeSwitches: []string{
 			"--excludeSwitches=enable-automation",
@@ -145,7 +190,7 @@ func (self *BossModel) StartChrome(Url string) string {
 	//service, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
 	_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
 	if err != nil {
-		log.Printf("Error starting the ChromeDriver server: %v", err)
+		panic(fmt.Sprintf("Error starting the ChromeDriver server: %v", err))
 	}
 	// 调起chrome浏览器
 	webDriver, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 19515))
@@ -176,18 +221,17 @@ func (self *BossModel) StartChrome(Url string) string {
 
 func (self *BossModel) WriteEls(param lib.JobData) {
 	coding := self.Coding
-	//self.Coding.Url = "http://els.zhangli0712.cn/boss/php"
-	self.Coding.Url = self.Cfg.Elasticsearch.Url
+	//self.Coding.Url = self.Cfg.Elasticsearch.Url
 	c_param := glib.Struct2Map(param)
-	self.Coding.Param = c_param
-	json_ret := lib.NewRequest(self.Coding, self.Cfg).Run().Text()
+	//self.Coding.Param = c_param
+	json_ret := lib.NewRequest(self.Coding, self.Cfg).Run(self.Cfg.Elasticsearch.Url, c_param).Text()
 
 	var mapResult map[string]interface{}
 	if err := json.Unmarshal([]byte(json_ret), &mapResult); err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
 	if _, ok := mapResult["_id"]; !ok {
-		fmt.Println(mapResult["status"])
+		self.l4gLogger.Info(mapResult["status"])
 	}
 	self.Coding = coding
 }
@@ -197,7 +241,7 @@ func (self *BossModel) Parse(resp *goquery.Document, city string, page int) []li
 	var line lib.JobData
 	job_data := make([]lib.JobData, 0)
 
-	fmt.Println(resp.Html())
+	self.l4gLogger.Info(resp.Html())
 
 	//return job_data
 

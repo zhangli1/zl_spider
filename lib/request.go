@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	//	"math/rand"
 	"net/http"
 	//"os"
@@ -24,11 +23,11 @@ func NewRequest(info config.UserConfigInfo, cfg config.Config) *Request {
 	return request
 }
 
-func (self *Request) Run() *goquery.Document {
-	return self.http_request()
+func (self *Request) Run(req_url string, req_param map[string]interface{}) *goquery.Document {
+	return self.http_request(req_url, req_param)
 }
 
-func (self *Request) http_request() *goquery.Document {
+func (self *Request) http_request(req_url string, req_param map[string]interface{}) *goquery.Document {
 	var tr *http.Transport
 	//先临时固定代理地址
 	/*proxy := func(_ *http.Request) (*url.URL, error) {
@@ -57,14 +56,14 @@ func (self *Request) http_request() *goquery.Document {
 	var resp *http.Response
 	var req *http.Request
 
-	b, _ := json.Marshal(self.UserConfigInfo.Param)
+	b, _ := json.Marshal(req_param)
 	body := bytes.NewBuffer(b)
-	if len(self.UserConfigInfo.Param) < 1 {
+	if len(req_param) < 1 {
 		//resp, _ = c.Get(self.UserConfig.Url)
-		req, _ = http.NewRequest("GET", self.UserConfigInfo.Url, nil)
+		req, _ = http.NewRequest("GET", req_url, nil)
 	} else {
 		//resp, _ = c.Post(self.UserConfig.Url, "application/x-www-form-urlencoded", body)
-		req, _ = http.NewRequest("POST", self.UserConfigInfo.Url, body)
+		req, _ = http.NewRequest("POST", req_url, body)
 	}
 
 	/*mua := []string{
@@ -107,7 +106,7 @@ func (self *Request) http_request() *goquery.Document {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
 	res, _ := goquery.NewDocumentFromResponse(resp)
 	//fmt.Println(res)

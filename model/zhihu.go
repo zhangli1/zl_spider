@@ -27,8 +27,8 @@ func NewZhihuModel(coding config.UserConfigInfo, cfg config.Config) *ZhihuModel 
 
 func (self *ZhihuModel) Run() interface{} {
 	fmt.Println(self.Coding.Url)
-
-	self.Parse(lib.NewRequest(self.Coding, self.Cfg).Run())
+	var req_param map[string]interface{}
+	self.Parse(lib.NewRequest(self.Coding, self.Cfg).Run(self.Coding.Url, req_param))
 
 	os.Exit(-1)
 	return ""
@@ -40,10 +40,10 @@ func (self *ZhihuModel) Run() interface{} {
 func (self *ZhihuModel) WriteEls(param lib.JobData) {
 	coding := self.Coding
 	//self.Coding.Url = "http://els.zhangli0712.cn/boss/php"
-	self.Coding.Url = self.Cfg.Elasticsearch.Url
+	//self.Coding.Url = self.Cfg.Elasticsearch.Url
 	c_param := glib.Struct2Map(param)
-	self.Coding.Param = c_param
-	json_ret := lib.NewRequest(self.Coding, self.Cfg).Run().Text()
+	//self.Coding.Param = c_param
+	json_ret := lib.NewRequest(self.Coding, self.Cfg).Run(self.Cfg.Elasticsearch.Url, c_param).Text()
 
 	var mapResult map[string]interface{}
 	if err := json.Unmarshal([]byte(json_ret), &mapResult); err != nil {

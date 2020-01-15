@@ -69,7 +69,7 @@ func GetUserConfigInfo() []UserConfigInfo {
 			Timeout:     15,
 			ModelPrefix: "freeip",
 			Action:      "freeip",
-			Switch:      false,
+			Switch:      true,
 		},
 	}
 	return user_config_info_list

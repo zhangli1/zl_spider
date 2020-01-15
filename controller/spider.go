@@ -5,32 +5,49 @@
 package controller
 
 import (
-	"fmt"
+	"os"
+	"sync"
 	"zl_spider/config"
+
+	l4g "code.google.com/p/log4go"
 )
 
 type Spider struct {
-	ExeDir string
-	Cfg    config.Config
+	ExeDir    string
+	Cfg       config.Config
+	LoggerMap map[string]*l4g.Logger
+	Sigs      chan os.Signal
+	Running   bool
 }
 
-func NewSpider(exeDir string, cfg config.Config) *Spider {
-	spider := &Spider{ExeDir: exeDir, Cfg: cfg}
+func NewSpider(exeDir string, cfg config.Config, logger_map map[string]*l4g.Logger, sigs chan os.Signal) *Spider {
+	spider := &Spider{ExeDir: exeDir, Cfg: cfg, LoggerMap: logger_map, Sigs: sigs}
 	return spider
 }
 
 func (self *Spider) Run() {
+	self.Running = false
 	//读取配置和规则
 	rule := NewRule()
 	user_config_info_list := rule.Run(self.Cfg)
 
+	var wg sync.WaitGroup
+
+	//runTask := make([]config.UserConfigInfo, 0)
 	for _, v := range user_config_info_list {
 		if v.Switch == false {
 			continue
 		}
-		route := NewRoute(v, self.Cfg)
-		fmt.Println(route.Run())
+		wg.Add(1)
+		//runTask = append(runTask, v)
+		go NewRoute(v, self.Cfg, self.LoggerMap, self.Sigs, wg).Run()
 	}
+
+	/*for _, vv := range runTask {
+		go NewRoute(vv, self.Cfg, self.l4gLogger, self.Sigs, wg).Run()
+	}*/
+	wg.Wait()
+
 }
 
 /*func (self *Spider) GetInfo(info config.UserConfigInfo) string {

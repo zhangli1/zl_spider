@@ -1,6 +1,7 @@
 package model
 
 import (
+
 	//"encoding/json"
 	"fmt"
 	//glib "lib"
@@ -26,7 +27,8 @@ func NewFeixiaoHaoModel(coding config.UserConfigInfo, cfg config.Config) *Feixia
 }
 
 func (self *FeixiaoHaoModel) Run() interface{} {
-	ret := lib.NewRequest(self.Coding, self.Cfg).Run()
+	var req_param map[string]interface{}
+	ret := lib.NewRequest(self.Coding, self.Cfg).Run(self.Coding.Url, req_param)
 	return self.Parse(ret)
 }
 
