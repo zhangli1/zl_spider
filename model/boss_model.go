@@ -16,8 +16,6 @@ import (
 
 	l4g "code.google.com/p/log4go"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/tebeka/selenium"
-	"github.com/tebeka/selenium/chrome"
 	ghtml "golang.org/x/net/html"
 )
 
@@ -74,6 +72,8 @@ func (self *BossModel) Run() interface{} {
 		self.Running = true
 	}()
 
+	redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
+
 	for {
 		if self.Running {
 			self.Wg.Done()
@@ -92,9 +92,24 @@ func (self *BossModel) Run() interface{} {
 					self.Coding.Url = req_url
 
 					req_ret := ""
+					proxy := ""
 					glib.Try(func() {
 						//req_ret, _ := lib.NewRequest(self.Coding, self.Cfg).Run().Html()
-						req_ret = self.StartChrome(req_url)
+						//req_ret = self.StartChrome(req_url)
+
+						jsonstrByRedis, _ := redis.GET("freeIps")
+						ipListStr := glib.B2S(jsonstrByRedis.([]uint8))
+
+						var ipList []string
+						json.Unmarshal([]byte(ipListStr), &ipList)
+						if len(ipList) < 1 {
+							proxy = self.Cfg.Proxy.Links
+						} else {
+							linkTmp := ipList[rand.Intn(len(ipList))]
+							proxy = strings.Replace(strings.Replace(linkTmp, "http://", "", -1), "https://", "", -1)
+						}
+
+						req_ret = lib.NewRequest(self.Coding, self.Cfg).StartChrome(req_url, proxy)
 					}, func(e interface{}) {
 						debug.PrintStack()
 						self.l4gLogger.Error(e)
@@ -138,83 +153,6 @@ func (self *BossModel) Run() interface{} {
 
 	return ""
 
-}
-
-func (self *BossModel) StartChrome(Url string) string {
-	opts := []selenium.ServiceOption{}
-	caps := selenium.Capabilities{
-		"browserName":     "chrome",
-		"excludeSwitches": "enable-automation",
-	}
-
-	// 禁止加载图片，加快渲染速度
-	imagCaps := map[string]interface{}{
-		"profile.managed_default_content_settings.images": 2,
-	}
-
-	/*proxyStr := ""
-	if self.Cfg.Proxy.Links != "" {
-		proxyStr = fmt.Sprintf("--proxy-server=%s", self.Cfg.Proxy.Links)
-	}*/
-
-	links := ""
-	redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
-
-	jsonstrByRedis, _ := redis.GET("freeIps")
-	ipListStr := glib.B2S(jsonstrByRedis.([]uint8))
-
-	var ipList []string
-	json.Unmarshal([]byte(ipListStr), &ipList)
-	if len(ipList) < 1 {
-		links = self.Cfg.Proxy.Links
-	} else {
-		linkTmp := ipList[rand.Intn(len(ipList))]
-		links = strings.Replace(strings.Replace(linkTmp, "http://", "", -1), "https://", "", -1)
-	}
-
-	chromeCaps := chrome.Capabilities{
-		Prefs: imagCaps,
-		Path:  "",
-		Args: []string{
-			"--headless", // 设置Chrome无头模式
-			"--no-sandbox",
-			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36", // 模拟user-agent，防反爬
-			fmt.Sprintf("--proxy-server=%s", links),
-		},
-		ExcludeSwitches: []string{
-			"--excludeSwitches=enable-automation",
-		},
-	}
-	caps.AddChrome(chromeCaps)
-	// 启动chromedriver，端口号可自定义
-	//service, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
-	_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
-	if err != nil {
-		panic(fmt.Sprintf("Error starting the ChromeDriver server: %v", err))
-	}
-	// 调起chrome浏览器
-	webDriver, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 19515))
-	if err != nil {
-		panic(err)
-	}
-	// 这是目标网站留下的坑，不加这个在linux系统中会显示手机网页，每个网站的策略不一样，需要区别处理。
-	/*webDriver.AddCookie(&selenium.Cookie{
-		Name:  "cookie",
-		Value: "",
-	})*/
-
-	// 导航到目标网站
-	err = webDriver.Get(Url)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to load page: %s\n", err))
-	}
-	//fmt.Println(webDriver.Title())
-	ret, err := webDriver.PageSource()
-	webDriver.Close()
-	if err == nil {
-		return ret
-	}
-	return ""
 }
 
 //写入Elasticsearch

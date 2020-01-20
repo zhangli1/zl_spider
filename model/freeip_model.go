@@ -99,6 +99,8 @@ func (self *FreeIpModel) Run() interface{} {
 
 	var free_ip_lists []FreeIpList
 	sucProxyList := make([]string, 0)
+
+	redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
 	for {
 		if self.Running {
 			self.Wg.Done()
@@ -117,11 +119,14 @@ func (self *FreeIpModel) Run() interface{} {
 			rand.Seed(time.Now().UnixNano()) //随机干扰
 			for _, v := range list {
 				glib.Try(func() {
-					reqProxy := fmt.Sprintf("%s://%s:%s", v.Protocol, v.Ip, v.Port)
+					//reqProxy := fmt.Sprintf("%s://%s:%s", v.Protocol, v.Ip, v.Port)
+					reqProxy := fmt.Sprintf("http://%s:%s", v.Ip, v.Port)
 					self.l4gLogger.Info(reqProxy)
 					ret = self.Curl(reqProxy, fmt.Sprintf("https://www.zhipin.com/mobile/jobs.json?city=c101010100&query=%s&page=%d", query[rand.Intn(3)], rand.Intn(5)))
 					if ret {
-						sucProxyList = append(sucProxyList, reqProxy)
+						if !glib.IsExistByKey(reqProxy, sucProxyList) {
+							sucProxyList = append(sucProxyList, reqProxy)
+						}
 					}
 				}, func(e interface{}) {
 					self.l4gLogger.Error(e)
@@ -131,21 +136,24 @@ func (self *FreeIpModel) Run() interface{} {
 		}
 		self.l4gLogger.Info(sucProxyList)
 		//初始化redis
-		redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
-		jsons, errs := json.Marshal(sucProxyList) //转换成JSON返回的是byte[]
-		if errs != nil {
-			self.l4gLogger.Error(errs.Error())
-		}
-		err := redis.Set("freeIps", string(jsons))
-		if err != nil {
-			self.l4gLogger.Error(fmt.Sprintf("insert redis %s", err))
-		}
-		self.l4gLogger.Info(string(jsons))
-		redis.Close()
+		glib.Try(func() {
+			jsons, errs := json.Marshal(sucProxyList) //转换成JSON返回的是byte[]
+			if errs != nil {
+				self.l4gLogger.Error(errs.Error())
+			}
+			err := redis.Set("freeIps", string(jsons))
+			if err != nil {
+				self.l4gLogger.Error(fmt.Sprintf("insert redis %s", err))
+			}
+			self.l4gLogger.Info(string(jsons))
+		}, func(e interface{}) {
+			self.l4gLogger.Error(e)
+		})
 
 		time.Sleep(time.Second * time.Duration(rand.Intn(120)))
 	}
 
+	redis.Close()
 	return ""
 
 }
@@ -180,9 +188,11 @@ func (self *FreeIpModel) Curl(proxy string, req_url string) bool {
 		}
 		respStr := string(body)
 		if !strings.Contains(respStr, "当前访问的IP存在异常行为") {
+			defer resp.Body.Close()
 			return true
 		}
 	}
+	defer resp.Body.Close()
 	return false
 }
 

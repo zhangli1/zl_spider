@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	//	"math/rand"
 	"net/http"
 	//"os"
@@ -11,6 +12,8 @@ import (
 	"zl_spider/config"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/tebeka/selenium"
+	"github.com/tebeka/selenium/chrome"
 )
 
 type Request struct {
@@ -36,13 +39,15 @@ func (self *Request) http_request(req_url string, req_param map[string]interface
 	if self.Cfg.Proxy.IsUse == 1 {
 
 		tr = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives: true,
 			//Proxy:           proxy,
 			//DisableCompression: true,
 		}
 	} else {
 		tr = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives: true,
 			//Proxy:           proxy,
 			//DisableCompression: true,
 		}
@@ -103,13 +108,74 @@ func (self *Request) http_request(req_url string, req_param map[string]interface
 		}
 		req.AddCookie(cookie1)
 	}*/
-
 	resp, err := c.Do(req)
 	if err != nil {
+		defer resp.Body.Close()
 		panic(err)
 	}
 	res, _ := goquery.NewDocumentFromResponse(resp)
 	//fmt.Println(res)
 	//os.Exit(-1)
+	defer resp.Body.Close()
 	return res
+}
+
+func (self *Request) StartChrome(Url string, Proxy string) string {
+	opts := []selenium.ServiceOption{}
+	caps := selenium.Capabilities{
+		"browserName":     "chrome",
+		"excludeSwitches": "enable-automation",
+	}
+
+	// 禁止加载图片，加快渲染速度
+	imagCaps := map[string]interface{}{
+		"profile.managed_default_content_settings.images": 2,
+	}
+
+	links := Proxy
+
+	chromeCaps := chrome.Capabilities{
+		Prefs: imagCaps,
+		Path:  "",
+		Args: []string{
+			"--headless", // 设置Chrome无头模式
+			"--no-sandbox",
+			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36", // 模拟user-agent，防反爬
+			fmt.Sprintf("--proxy-server=%s", links),
+		},
+		ExcludeSwitches: []string{
+			"--excludeSwitches=enable-automation",
+		},
+	}
+	caps.AddChrome(chromeCaps)
+	// 启动chromedriver，端口号可自定义
+	//service, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
+	_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
+	if err != nil {
+		panic(fmt.Sprintf("Error starting the ChromeDriver server: %v", err))
+	}
+	// 调起chrome浏览器
+	webDriver, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 19515))
+	defer webDriver.Close()
+	if err != nil {
+		panic(err)
+	}
+	// 这是目标网站留下的坑，不加这个在linux系统中会显示手机网页，每个网站的策略不一样，需要区别处理。
+	/*webDriver.AddCookie(&selenium.Cookie{
+		Name:  "cookie",
+		Value: "",
+	})*/
+
+	// 导航到目标网站
+	err = webDriver.Get(Url)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to load page: %s\n", err))
+	}
+	//fmt.Println(webDriver.Title())
+	ret, err := webDriver.PageSource()
+	webDriver.DeleteAllCookies()
+	if err == nil {
+		return ret
+	}
+	return ""
 }
