@@ -100,7 +100,8 @@ func (self *FreeIpModel) Run() interface{} {
 	var free_ip_lists []FreeIpList
 	sucProxyList := make([]string, 0)
 
-	redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
+	//redis := glib.NewRedis(self.Cfg.Redis.Host, self.Cfg.Redis.Port, self.Cfg.Redis.Passwd, self.Cfg.Redis.Select)
+
 	for {
 		if self.Running {
 			self.Wg.Done()
@@ -118,11 +119,12 @@ func (self *FreeIpModel) Run() interface{} {
 			ret := false
 			rand.Seed(time.Now().UnixNano()) //随机干扰
 			for _, v := range list {
+				mt_rand := rand.Intn(3) + 1
 				glib.Try(func() {
 					//reqProxy := fmt.Sprintf("%s://%s:%s", v.Protocol, v.Ip, v.Port)
 					reqProxy := fmt.Sprintf("http://%s:%s", v.Ip, v.Port)
 					self.l4gLogger.Info(reqProxy)
-					ret = self.Curl(reqProxy, fmt.Sprintf("https://www.zhipin.com/mobile/jobs.json?city=c101010100&query=%s&page=%d", query[rand.Intn(3)], rand.Intn(5)))
+					ret = self.Curl(reqProxy, fmt.Sprintf("https://www.zhipin.com/mobile/jobs.json?city=c101010100&query=%s&page=%d", query[rand.Intn(3)], mt_rand), "")
 					if ret {
 						if !glib.IsExistByKey(reqProxy, sucProxyList) {
 							sucProxyList = append(sucProxyList, reqProxy)
@@ -131,10 +133,11 @@ func (self *FreeIpModel) Run() interface{} {
 				}, func(e interface{}) {
 					self.l4gLogger.Error(e)
 				})
-				time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+
+				time.Sleep(time.Second * time.Duration(mt_rand))
 			}
 		}
-		self.l4gLogger.Info(sucProxyList)
+		/*self.l4gLogger.Info(sucProxyList)
 		//初始化redis
 		glib.Try(func() {
 			jsons, errs := json.Marshal(sucProxyList) //转换成JSON返回的是byte[]
@@ -148,28 +151,30 @@ func (self *FreeIpModel) Run() interface{} {
 			self.l4gLogger.Info(string(jsons))
 		}, func(e interface{}) {
 			self.l4gLogger.Error(e)
-		})
+		})*/
 
 		time.Sleep(time.Second * time.Duration(rand.Intn(120)))
 	}
 
-	redis.Close()
+	//redis.Close()
 	return ""
 
 }
 
-func (self *FreeIpModel) Curl(proxy string, req_url string) bool {
+func (self *FreeIpModel) Curl(proxy string, req_url string, checkStr string) bool {
 	var tr *http.Transport
 	proxyHandle, _ := url.Parse(proxy)
 
 	tr = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyURL(proxyHandle),
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+		Proxy:             http.ProxyURL(proxyHandle),
+		DisableKeepAlives: true,
 		//DisableCompression: true,
 	}
+	defer tr.CloseIdleConnections()
 
 	c := &http.Client{
-		Timeout:   time.Duration(5) * time.Second,
+		Timeout:   time.Duration(10) * time.Second,
 		Transport: tr,
 	}
 
@@ -178,16 +183,25 @@ func (self *FreeIpModel) Curl(proxy string, req_url string) bool {
 
 	req, _ = http.NewRequest("GET", req_url, nil)
 	resp, err := c.Do(req)
+
 	if err != nil {
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		panic(err)
+		//self.l4gLogger.Error(fmt.Sprintf("req: %s, err: %v", req_url, err))
+		//return false
 	}
 	if resp.StatusCode == 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			panic(err)
-		}
+		body := glib.ReadAll2(resp.Body)
+
 		respStr := string(body)
 		if !strings.Contains(respStr, "当前访问的IP存在异常行为") {
+			defer resp.Body.Close()
+			return true
+		}
+
+		if strings.Contains(respStr, checkStr) {
 			defer resp.Body.Close()
 			return true
 		}
@@ -256,6 +270,10 @@ func (self *FreeIpModel) StartChrome(Url string) string {
 		return ret
 	}
 	return ""
+}
+
+func (self *FreeIpModel) ProcessHttpProxyStr(ip string, port string) string {
+	return fmt.Sprintf("http://%s:%s", ip, port)
 }
 
 func (self *FreeIpModel) Destruct(param interface{}) interface{} {

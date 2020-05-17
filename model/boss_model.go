@@ -43,11 +43,11 @@ func NewBossModel(coding config.UserConfigInfo, cfg config.Config, logger *l4g.L
 func (self *BossModel) Run() interface{} {
 	fmt.Println("BossModel")
 	city_list := make(map[string]string, 0)
-	city_list["c101010100"] = "北京"
-	city_list["c101020100"] = "上海"
-	city_list["c101280100"] = "广州"
-	city_list["c101280600"] = "深圳"
-	city_list["c101200100"] = "武汉"
+	city_list["101010100"] = "北京"
+	city_list["101020100"] = "上海"
+	city_list["101280100"] = "广州"
+	city_list["101280600"] = "深圳"
+	city_list["101200100"] = "武汉"
 
 	position := make([]string, 0)
 	position = []string{"php", "python", "golang"}
@@ -93,29 +93,60 @@ func (self *BossModel) Run() interface{} {
 
 					req_ret := ""
 					proxy := ""
+					var ipList []string
 					glib.Try(func() {
 						//req_ret, _ := lib.NewRequest(self.Coding, self.Cfg).Run().Html()
 						//req_ret = self.StartChrome(req_url)
 
-						jsonstrByRedis, _ := redis.GET("freeIps")
-						ipListStr := glib.B2S(jsonstrByRedis.([]uint8))
+						jsonstrByRedis, err := redis.GET("2")
+						if err == nil {
+							ipListStr := glib.B2S(jsonstrByRedis.([]uint8))
 
-						var ipList []string
-						json.Unmarshal([]byte(ipListStr), &ipList)
-						if len(ipList) < 1 {
-							proxy = self.Cfg.Proxy.Links
-						} else {
-							linkTmp := ipList[rand.Intn(len(ipList))]
-							proxy = strings.Replace(strings.Replace(linkTmp, "http://", "", -1), "https://", "", -1)
+							json.Unmarshal([]byte(ipListStr), &ipList)
+							if len(ipList) < 1 {
+								proxy = self.Cfg.Proxy.Links
+							} else {
+								linkTmp := ipList[rand.Intn(len(ipList))]
+								proxy = strings.Replace(strings.Replace(linkTmp, "http://", "", -1), "https://", "", -1)
+							}
+
+							req_ret = lib.NewRequest(self.Coding, self.Cfg).StartChrome(req_url, proxy)
 						}
-
-						req_ret = lib.NewRequest(self.Coding, self.Cfg).StartChrome(req_url, proxy)
 					}, func(e interface{}) {
-						debug.PrintStack()
 						self.l4gLogger.Error(e)
 						self.l4gLogger.Error(debug.Stack())
 					})
 					if len(req_ret) < 50 {
+						reqProxy := fmt.Sprintf("http://%s", proxy)
+						if !glib.IsExistByKey(reqProxy, FilterIPList) {
+							FilterIPList = append(FilterIPList, reqProxy)
+						}
+
+						//更新redis中代理列表
+						/*newRedisFreeData := make([]string, 0)
+						if len(ipList) > 0 {
+							for _, v := range ipList {
+								if !glib.IsExistByKey(v, FilterIPList) {
+									newRedisFreeData = append(newRedisFreeData, v)
+								}
+							}
+
+							//boss初始化redis
+							glib.Try(func() {
+								jsons, errs := json.Marshal(newRedisFreeData) //转换成JSON返回的是byte[]
+								if errs != nil {
+									self.l4gLogger.Error(glib.GetCurrentFuncName(), errs.Error())
+								}
+								err := redis.Set("freeIps", string(jsons))
+								if err != nil {
+									self.l4gLogger.Error(glib.GetCurrentFuncName(), fmt.Sprintf("insert redis %s", err))
+								}
+								self.l4gLogger.Info(string(jsons))
+							}, func(e interface{}) {
+								self.l4gLogger.Error(glib.GetCurrentFuncName(), e)
+							})
+						}*/
+
 						continue
 					}
 					jsonStr := req_ret[84 : len(req_ret)-20]

@@ -31,6 +31,9 @@ func (self *Route) Run() interface{} {
 	model_list["feixiaohao"] = model.NewFeixiaoHaoModel(self.Coding, self.Cfg)
 	model_list["v2ex"] = model.NewV2exModel(self.Coding, self.Cfg)
 	model_list["freeip"] = model.NewFreeIpModel(self.Coding, self.Cfg, self.LoggerMap["freeip"], self.Sigs, self.Wg)
+	model_list["xicidaili"] = model.NewXicidailiModel(self.Coding, self.Cfg, self.LoggerMap["xicidaili"], self.Sigs, self.Wg)
+	model_list["kuaidaili"] = model.NewKuaidailiModel(self.Coding, self.Cfg, self.LoggerMap["xicidaili"], self.Sigs, self.Wg)
+	model_list["nimadaili"] = model.NewNimadailiModel(self.Coding, self.Cfg, self.LoggerMap["xicidaili"], self.Sigs, self.Wg)
 
 	if model_list[self.Coding.ModelPrefix] != nil {
 		return model_list[self.Coding.ModelPrefix].Run()

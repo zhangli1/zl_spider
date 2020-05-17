@@ -1,9 +1,13 @@
 package lib
 
 import (
+
 	//"database/sql"
 	//"fmt"
+	"fmt"
 	"lib"
+	"os"
+
 	//"os"
 	//"strings"
 
@@ -20,13 +24,51 @@ func NewDb(logger *l4g.Logger, mysql *lib.Mysql) *Db {
 }
 
 //写入监控数据
-func (d *Db) InsertMonitor(sql string) bool {
+/*func (d *Db) InsertMonitor(sql string) bool {
 	return d.Mysql.Exec(sql)
 }
 
 //更新监控数据
 func (d *Db) UpdateMonitor(sql string) bool {
 	return d.Mysql.Exec(sql)
+}*/
+
+//获取mysql proxy表数据
+func (d *Db) GetProxyData(sql string) []Proxy {
+	var id int
+	var url string
+	var template string
+	var paramList string
+	var list string
+	var checkStr string
+
+	rows, retStatus := d.Mysql.Query(sql)
+	defer rows.Close()
+
+	ret := make([]Proxy, 0)
+	if !retStatus {
+		d.l4gLogger.Error(fmt.Sprintf("find %s data fail.", lib.GetCurrentFuncName()))
+		fmt.Println(fmt.Sprintf("find %s data fail.", lib.GetCurrentFuncName()))
+		return ret
+	}
+
+	var line Proxy
+	for rows.Next() {
+		line = Proxy{}
+		if err := rows.Scan(&id, &url, &template, &paramList, &list, &checkStr); err != nil {
+			fmt.Println("get project data fail", err)
+			os.Exit(-1)
+
+		}
+		line.ID = id
+		line.Url = url
+		line.Template = template
+		line.ParamList = paramList
+		line.List = list
+		line.CheckStr = checkStr
+		ret = append(ret, line)
+	}
+	return ret
 }
 
 //获取订单偏差数据

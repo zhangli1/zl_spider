@@ -5,9 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strings"
 	//	"math/rand"
 	"net/http"
 	//"os"
+	glib "lib"
 	"time"
 	"zl_spider/config"
 
@@ -71,7 +74,7 @@ func (self *Request) http_request(req_url string, req_param map[string]interface
 		req, _ = http.NewRequest("POST", req_url, body)
 	}
 
-	/*mua := []string{
+	mua := []string{
 		"Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; AcooBrowser; .NET CLR 1.1.4322; .NET CLR 2.0.50727)",
 		"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0; Acoo Browser; SLCC1; .NET CLR 2.0.50727; Media Center PC 5.0; .NET CLR 3.0.04506)",
 		"Mozilla/4.0 (compatible; MSIE 7.0; AOL 9.5; AOLBuild 4337.35; Windows NT 5.1; .NET CLR 1.1.4322; .NET CLR 2.0.50727)",
@@ -90,11 +93,11 @@ func (self *Request) http_request(req_url string, req_param map[string]interface
 		"Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; fr) Presto/2.9.168 Version/11.52",
 	}
 
-	rmua := mua[rand.Intn(16)]
-	*/
+	rand.Seed(time.Now().UnixNano()) //随机干扰
+	rmua := mua[rand.Intn(15)]
 
-	//req.Header.Set("User-Agent", rmua)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
+	req.Header.Set("User-Agent", rmua)
+	//req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 
 	//添加cookie
@@ -109,15 +112,20 @@ func (self *Request) http_request(req_url string, req_param map[string]interface
 		req.AddCookie(cookie1)
 	}*/
 	resp, err := c.Do(req)
+
 	if err != nil {
+		//panic(err)
+		resp := "<html><head></head><body></body></html>"
+		res, _ := goquery.NewDocumentFromReader(strings.NewReader(resp))
+		return res
+	} else {
+		res, _ := goquery.NewDocumentFromResponse(resp)
+		//fmt.Println(res)
+		//os.Exit(-1)
 		defer resp.Body.Close()
-		panic(err)
+		return res
 	}
-	res, _ := goquery.NewDocumentFromResponse(resp)
-	//fmt.Println(res)
-	//os.Exit(-1)
-	defer resp.Body.Close()
-	return res
+
 }
 
 func (self *Request) StartChrome(Url string, Proxy string) string {
@@ -150,9 +158,12 @@ func (self *Request) StartChrome(Url string, Proxy string) string {
 	caps.AddChrome(chromeCaps)
 	// 启动chromedriver，端口号可自定义
 	//service, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
-	_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
-	if err != nil {
-		panic(fmt.Sprintf("Error starting the ChromeDriver server: %v", err))
+
+	if !glib.CheckPort("127.0.0.1", 19515) {
+		_, err := selenium.NewChromeDriverService("chromedriver", 19515, opts...)
+		if err != nil {
+			panic(fmt.Sprintf("Error starting the ChromeDriver server: %v", err))
+		}
 	}
 	// 调起chrome浏览器
 	webDriver, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 19515))

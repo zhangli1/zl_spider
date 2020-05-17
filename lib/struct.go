@@ -17,3 +17,12 @@ type JobData struct {
 	FinancingSituation string //融资情况
 	CreateTime         string //创建时间
 }
+
+type Proxy struct {
+	ID        int    //ID
+	Url       string //代理
+	Template  string //模板
+	ParamList string //参数列表
+	List      string //代理列表
+	CheckStr  string //验证代理通过后的字符
+}

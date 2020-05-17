@@ -48,6 +48,7 @@ func main() {
 	loggerConfigMap := make(map[string]*l4g.Logger, 0)
 	loggerConfigMap["boss"] = &globalLoggerBoss
 	loggerConfigMap["freeip"] = &globalLogger
+	loggerConfigMap["xicidaili"] = &globalLogger
 	spider := controller.NewSpider(dir, server_cfg, loggerConfigMap, sigs)
 
 	spider.Run()
